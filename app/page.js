@@ -99,6 +99,14 @@ export default function Home() {
   const [cart, setCart] = useState([]);
   const [seller, setSeller] = useState(false);
   const [login, setLogin] = useState(false);
+  const [cartOpen, setCartOpen] = useState(false);
+  const [checkout, setCheckout] = useState(false);
+
+  const [customer, setCustomer] = useState({
+    name: '',
+    phone: '',
+    address: ''
+  });
 
   const list = useMemo(
     () =>
@@ -111,10 +119,84 @@ export default function Home() {
     [cat, q]
   );
 
-  const total = cart.reduce((s, p) => s + p.price, 0);
+  const total = cart.reduce(
+    (sum, item) => sum + item.price * item.qty,
+    0
+  );
 
-  const add = (p) => {
-    setCart([...cart, p]);
+  const cartCount = cart.reduce(
+    (sum, item) => sum + item.qty,
+    0
+  );
+
+  const add = (product) => {
+    setCart((current) => {
+      const found = current.find(
+        (item) => item.id === product.id
+      );
+
+      if (found) {
+        return current.map((item) =>
+          item.id === product.id
+            ? { ...item, qty: item.qty + 1 }
+            : item
+        );
+      }
+
+      return [...current, { ...product, qty: 1 }];
+    });
+  };
+
+  const increase = (id) => {
+    setCart((current) =>
+      current.map((item) =>
+        item.id === id
+          ? { ...item, qty: item.qty + 1 }
+          : item
+      )
+    );
+  };
+
+  const decrease = (id) => {
+    setCart((current) =>
+      current
+        .map((item) =>
+          item.id === id
+            ? { ...item, qty: item.qty - 1 }
+            : item
+        )
+        .filter((item) => item.qty > 0)
+    );
+  };
+
+  const removeItem = (id) => {
+    setCart((current) =>
+      current.filter((item) => item.id !== id)
+    );
+  };
+
+  const submitOrder = () => {
+    if (!customer.name || !customer.phone || !customer.address) {
+      alert('Нэр, утас, хүргэлтийн хаягаа бүрэн оруулна уу.');
+      return;
+    }
+
+    alert(
+      `Захиалга амжилттай илгээгдлээ!\n\n` +
+      `Захиалагч: ${customer.name}\n` +
+      `Утас: ${customer.phone}\n` +
+      `Хаяг: ${customer.address}\n` +
+      `Нийт: ${money(total)}`
+    );
+
+    setCart([]);
+    setCustomer({
+      name: '',
+      phone: '',
+      address: ''
+    });
+    setCheckout(false);
+    setCartOpen(false);
   };
 
   return (
@@ -124,7 +206,9 @@ export default function Home() {
           🥛
           <div>
             <span>ЦАГААН ИДЭЭ</span>
-            <small>Монголын цагаан идээний онлайн зах</small>
+            <small>
+              Монголын цагаан идээний онлайн зах
+            </small>
           </div>
         </div>
 
@@ -135,15 +219,9 @@ export default function Home() {
 
           <button
             className="cart"
-            onClick={() =>
-              alert(
-                cart.length
-                  ? `Сагс: ${cart.length} бараа • ${money(total)}`
-                  : 'Сагс хоосон'
-              )
-            }
+            onClick={() => setCartOpen(true)}
           >
-            🛒 {cart.length}
+            🛒 {cartCount}
           </button>
         </div>
       </header>
@@ -321,15 +399,165 @@ export default function Home() {
         <span>© 2026</span>
       </footer>
 
+      {cartOpen && (
+        <Modal
+          title="Таны сагс"
+          close={() => setCartOpen(false)}
+        >
+          {cart.length === 0 ? (
+            <>
+              <p>🛒 Таны сагс одоогоор хоосон байна.</p>
+
+              <button
+                className="primary"
+                onClick={() => setCartOpen(false)}
+              >
+                Бараа үзэх
+              </button>
+            </>
+          ) : (
+            <>
+              <div
+                style={{
+                  display: 'grid',
+                  gap: '14px'
+                }}
+              >
+                {cart.map((item) => (
+                  <div
+                    key={item.id}
+                    style={{
+                      borderBottom: '1px solid #eee',
+                      paddingBottom: '14px'
+                    }}
+                  >
+                    <strong>{item.name}</strong>
+
+                    <p>
+                      {money(item.price)} × {item.qty}
+                    </p>
+
+                    <div
+                      style={{
+                        display: 'flex',
+                        gap: '8px',
+                        alignItems: 'center'
+                      }}
+                    >
+                      <button
+                        className="outline"
+                        onClick={() =>
+                          decrease(item.id)
+                        }
+                      >
+                        −
+                      </button>
+
+                      <strong>{item.qty}</strong>
+
+                      <button
+                        className="outline"
+                        onClick={() =>
+                          increase(item.id)
+                        }
+                      >
+                        ＋
+                      </button>
+
+                      <button
+                        className="outline"
+                        onClick={() =>
+                          removeItem(item.id)
+                        }
+                      >
+                        🗑
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <h2>
+                Нийт: {money(total)}
+              </h2>
+
+              <button
+                className="primary"
+                onClick={() => setCheckout(true)}
+              >
+                Захиалга өгөх →
+              </button>
+            </>
+          )}
+        </Modal>
+      )}
+
+      {checkout && (
+        <Modal
+          title="Захиалга баталгаажуулах"
+          close={() => setCheckout(false)}
+        >
+          <input
+            placeholder="Таны нэр"
+            value={customer.name}
+            onChange={(e) =>
+              setCustomer({
+                ...customer,
+                name: e.target.value
+              })
+            }
+          />
+
+          <input
+            placeholder="Утасны дугаар"
+            type="tel"
+            value={customer.phone}
+            onChange={(e) =>
+              setCustomer({
+                ...customer,
+                phone: e.target.value
+              })
+            }
+          />
+
+          <textarea
+            placeholder="Хүргэлтийн хаяг"
+            value={customer.address}
+            onChange={(e) =>
+              setCustomer({
+                ...customer,
+                address: e.target.value
+              })
+            }
+          />
+
+          <h3>
+            Төлөх дүн: {money(total)}
+          </h3>
+
+          <button
+            className="primary"
+            onClick={submitOrder}
+          >
+            Захиалгаа баталгаажуулах
+          </button>
+        </Modal>
+      )}
+
       {seller && (
         <Modal
           title="Худалдагчаар бүртгүүлэх"
           close={() => setSeller(false)}
         >
           <input placeholder="Нэр / дэлгүүрийн нэр" />
-          <input placeholder="Утасны дугаар" />
+          <input
+            placeholder="Утасны дугаар"
+            type="tel"
+          />
           <input placeholder="Аймаг, сум" />
-          <textarea placeholder="Ямар цагаан идээ зардаг вэ?" />
+          <textarea
+            placeholder="Ямар цагаан идээ зардаг вэ?"
+          />
 
           <button
             className="primary"
@@ -350,7 +578,11 @@ export default function Home() {
           title="Нэвтрэх / бүртгүүлэх"
           close={() => setLogin(false)}
         >
-          <input placeholder="Утасны дугаар" />
+          <input
+            placeholder="Утасны дугаар"
+            type="tel"
+          />
+
           <input
             placeholder="Нууц үг"
             type="password"
